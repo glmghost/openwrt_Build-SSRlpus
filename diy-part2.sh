@@ -4,15 +4,12 @@
 # File name: diy-part2.sh
 # Description: OpenWrt DIY script part 2 (After Update feeds & Install feeds)
 #
-# This script runs AFTER feeds are installed, so we can safely patch files in feeds/
-#
 
 # ==============================
 # Fix Rust build failure in CI
 # ==============================
 if [ -f "feeds/packages/lang/rust/Makefile" ]; then
     echo "🔧 Applying Rust CI compatibility patch..."
-    # Patch the cargo build command to use 'if-unchanged' for download-ci-llvm
     sed -i 's|cargo build --manifest-path|CARGO_HOME=/tmp/cargo RUST_BACKTRACE=1 cargo build --config "build.download-ci-llvm = \\\"if-unchanged\\\"" --manifest-path|g' feeds/packages/lang/rust/Makefile
     echo "✅ Rust patch applied."
 else
@@ -20,21 +17,45 @@ else
 fi
 
 # ==============================
-# Optional: Remove conflicting packages from official feeds
-# (Only needed if you use passwall or helloworld)
+# Set custom default IP address
 # ==============================
-# If using passwall, remove official versions to avoid conflict
-# rm -rf feeds/packages/net/{xray-core,sing-box,geoview}
-# rm -rf feeds/luci/applications/luci-app-passwall
+echo "🔧 Setting default LAN IP to 192.168.2.1..."
+mkdir -p files/etc/config
+cat > files/etc/config/network << EOF
+config interface 'loopback'
+    option device 'lo'
+    option proto 'static'
+    option ipaddr '127.0.0.1'
+    option netmask '255.0.0.0'
 
-# If using helloworld, remove official ssr-plus if exists
-# rm -rf feeds/luci/applications/luci-app-ssr-plus
+config globals 'globals'
+    option ula_prefix 'fd00::/8'
+
+config interface 'lan'
+    option device 'br-lan'
+    option proto 'static'
+    option ipaddr '192.168.31.238'
+    option netmask '255.255.255.0'
+    option ip6assign '60'
+
+config interface 'wan'
+    option device 'eth0'
+    option proto 'dhcp'
+
+config interface 'wan6'
+    option device 'eth0'
+    option proto 'dhcpv6'
+EOF
+echo "✅ Default IP set to 192.168.31.238"
 
 # ==============================
-# Your custom configuration below (optional)
+# Optional: Customize other defaults (e.g., hostname)
 # ==============================
-# Example: Copy your config
-# cp -f $GITHUB_WORKSPACE/.config ./
+# mkdir -p files/etc
+# echo "myrouter" > files/etc/hostname
 
-# Example: Enable specific package
+# ==============================
+# Your other customizations below (optional)
+# ==============================
+# Example: Enable specific package via config
 # ./scripts/config/conf --enable PACKAGE_luci-app-helloworld
