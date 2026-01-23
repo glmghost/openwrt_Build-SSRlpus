@@ -19,7 +19,7 @@ fi
 # ==============================
 # Set custom default IP address
 # ==============================
-echo "🔧 Setting default LAN IP to 192.168.2.1..."
+echo "🔧 Setting default LAN IP to 192.168.31.238..."
 mkdir -p files/etc/config
 cat > files/etc/config/network << EOF
 config interface 'loopback'
