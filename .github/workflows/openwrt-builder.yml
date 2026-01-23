@@ -66,6 +66,11 @@ jobs:
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
+    - name: Debug - Check if naiveproxy is available
+      run: |
+       cd openwrt
+       ./scripts/feeds list -s | grep naiveproxy || echo "naiveproxy NOT FOUND!"
+
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
