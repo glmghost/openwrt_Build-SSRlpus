@@ -1,27 +1,27 @@
 #!/bin/bash
 #
-# https://github.com/P3TERX/Actions-OpenWrt
-# File name: diy-part2.sh
-# Description: OpenWrt DIY script part 2 (After Update feeds & Install feeds)
+# This script runs AFTER feeds are installed.
+# Working directory: openwrt/
 #
 
 # ==============================
-# Fix Rust build failure in CI
+# Fix Rust CI build error
 # ==============================
 if [ -f "feeds/packages/lang/rust/Makefile" ]; then
     echo "🔧 Applying Rust CI compatibility patch..."
     sed -i 's|cargo build --manifest-path|CARGO_HOME=/tmp/cargo RUST_BACKTRACE=1 cargo build --config "build.download-ci-llvm = \\\"if-unchanged\\\"" --manifest-path|g' feeds/packages/lang/rust/Makefile
     echo "✅ Rust patch applied."
 else
-    echo "⚠️ Rust not found in feeds, skipping patch."
+    echo "⚠️ Rust not found, skipping patch."
 fi
 
 # ==============================
-# Set custom default IP address
+# Set default LAN IP to 192.168.31.238
+# NOTE: This creates openwrt/files/ which will be packed into firmware
 # ==============================
-echo "🔧 Setting default LAN IP to 192.168.31.238..."
+echo "🔧 Setting default IP to 192.168.31.238..."
 mkdir -p files/etc/config
-cat > files/etc/config/network << EOF
+cat > files/etc/config/network << 'EOF'
 config interface 'loopback'
     option device 'lo'
     option proto 'static'
@@ -46,16 +46,10 @@ config interface 'wan6'
     option device 'eth0'
     option proto 'dhcpv6'
 EOF
-echo "✅ Default IP set to 192.168.31.238"
+echo "✅ Network config created in ./files/etc/config/network"
 
 # ==============================
-# Optional: Customize other defaults (e.g., hostname)
+# Optional: Set default hostname
 # ==============================
 # mkdir -p files/etc
-# echo "myrouter" > files/etc/hostname
-
-# ==============================
-# Your other customizations below (optional)
-# ==============================
-# Example: Enable specific package via config
-# ./scripts/config/conf --enable PACKAGE_luci-app-helloworld
+# echo "MyOpenWrt" > files/etc/hostname
