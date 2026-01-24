@@ -43,13 +43,16 @@ jobs:
         # 清理旧环境
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
     
-        # 更新软件包列表（关键：启用 universe 仓库）
+        # 更新软件包列表
         sudo -E apt-get -qq update
+    
+        # 启用 universe 仓库（关键修复）
         sudo -E apt-get -qq install -y software-properties-common
         sudo -E add-apt-repository -y universe
+        sudo -E apt-get -qq update
     
-        # 安装 OpenWrt 官方推荐的依赖（Ubuntu 24.04 专用）
-        sudo -E apt-get -qq install -y build-essential libncurses5-dev gawk wget git-core unzip libssl-dev \
+        # 安装 OpenWrt 24.10 专用依赖（Ubuntu 24.04 适配版）
+        sudo -E apt-get -qq install -y build-essential libncurses-dev gawk wget git-core unzip libssl-dev \
             libelf-dev libpcre3-dev libreadline-dev libsqlite3-dev libxml2-dev libxslt1-dev \
             libzstd-dev libbz2-dev liblzma-dev liblz4-dev libffi-dev
     
