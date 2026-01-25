@@ -1,105 +1,139 @@
-#
-# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
-# Modified for OpenWrt official repo + rust fix + custom IP
-#
+#=================================================
+# Description: Build OpenWrt using GitHub Actions
+# License: MIT
+# Author: kenzo
+# Modified: Fixed all syntax errors (especially environment variable spacing)
+#=================================================
 
-name: Build OpenWrt
+name: OpenWrt Build with Custom Config
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
       ssh:
-        description: 'SSH connection to Actions'
+        description: 'ssh'
         required: false
         default: 'false'
+      openwrt_version:
+        type: choice
+        description: 'OpenWrt Version'
+        required: true
+        default: '23.05'
+        options:
+          - '23.05'
+          - '22.03'
+          - 'master'
 
 env:
-  REPO_URL: https://github.com/openwrt/openwrt
-  REPO_BRANCH: openwrt-24.10
-  FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: .config
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_COWTRANSFER: false
   UPLOAD_WETRANSFER: false
-  UPLOAD_RELEASE: false
+  UPLOAD_RELEASE: true
+  SSH_PRIVATE_KEY:  $ {{ secrets.SSH_PRIVATE_KEY }}
+  PASSWORD:  $ {{ secrets.PASSWORD }}
+  REMOTE_HOST:  $ {{ secrets.REMOTE_HOST }}
+  REMOTE_PORT:  $ {{ secrets.REMOTE_PORT }}
+  DOCKER_ID:  $ {{ secrets.DOCKER_ID }}
+  DOCKER_PASSWD:  $ {{ secrets.DOCKER_PASSWD }}  
   TZ: Asia/Shanghai
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    if: github.event.repository.owner.id == github.event.sender.id
 
+    name: Build OpenWrt  $ {{ github.event.inputs.openwrt_version }}
+    
     steps:
     - name: Checkout
       uses: actions/checkout@main
+
+    - name: Free disk space
+      uses: coder-xiaomo/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true       
 
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        # 清理旧环境
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-    
-        # 更新软件包列表
         sudo -E apt-get -qq update
-    
-        # 启用 universe 仓库（关键修复）
-        sudo -E apt-get -qq install -y software-properties-common
-        sudo -E add-apt-repository -y universe
-        sudo -E apt-get -qq update
-    
-        # 安装 OpenWrt 24.10 专用依赖（Ubuntu 24.04 适配版）
-        sudo -E apt-get -qq install -y build-essential libncurses-dev gawk wget git-core unzip libssl-dev \
-            libelf-dev libpcre3-dev libreadline-dev libsqlite3-dev libxml2-dev libxslt1-dev \
-            libzstd-dev libbz2-dev liblzma-dev liblz4-dev libffi-dev
-    
-        # 清理
+        sudo -E apt-get -qq install build-essential clang flex bison g++ gawk \
+        gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
+        python3-setuptools rsync swig unzip zlib1g-dev file wget scdoc \
+        llvm python3-pyelftools libpython3-dev aria2 jq qemu-utils ccache rename \
+        libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
-        sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-        sudo mkdir -p /workdir
-        sudo chown  $ USER: $ GROUPS /workdir
-
-    - name: Verify dependencies
+        sudo timedatectl set-timezone "Asia/Shanghai"
+        
+    - name: Get current date
+      id: date
       run: |
-        echo "Checking libncurses-dev:  $ (dpkg -l | grep libncurses-dev)"
-        echo "Checking libelf-dev:  $ (dpkg -l | grep libelf-dev)"
-
+        echo "date= $ (date +'%Y.%m.%d-%H%M')" >>  $ GITHUB_ENV
+        echo "date2= $ (date +'%m/%d %Y')" >>  $ GITHUB_ENV
+        echo "date3= $ (date +'%m.%d')" >>  $ GITHUB_ENV
+        echo "DOCKERTAG= $ {{ secrets.DOCKER_ID }}/openwrt-6p:latest" >>  $ GITHUB_ENV
+        VERSION=" $ (echo " $ {{github.event.action}}" | grep -Eo " [0-9.]+" | sed -e 's/ //')" || true
+        [ " $ VERSION" ] && echo "VERSION= $ VERSION" >>  $ GITHUB_ENV || echo "VERSION= $ (date +'%m.%d')" >>  $ GITHUB_ENV
+        
     - name: Clone source code
-      working-directory: /workdir
+      env: 
+        REPO_URL: https://github.com/openwrt/openwrt
+        REPO_BRANCH: openwrt- $ {{ github.event.inputs.openwrt_version }}
       run: |
-        df -hT  $ PWD
-        git clone  $ REPO_URL -b  $ REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt  $ GITHUB_WORKSPACE/openwrt
+        git clone --depth 1  $ REPO_URL -b  $ REPO_BRANCH openwrt
 
-    - name: Load custom feeds
+    - name: Free up disk space
+      env:
+        DEBIAN_FRONTEND: noninteractive
       run: |
-        [ -e  $ FEEDS_CONF ] && mv  $ FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x  $ DIY_P1_SH
-        cd openwrt
-         $ GITHUB_WORKSPACE/ $ DIY_P1_SH
+        sudo mkdir -p -m 777 /mnt/openwrt/dl /mnt/openwrt/bin /mnt/openwrt/staging_dir
+        ln -sf /mnt/openwrt/dl openwrt/dl
+        ln -sf /mnt/openwrt/bin openwrt/bin
+        ln -sf /mnt/openwrt/staging_dir openwrt/staging_dir
+
+    - name: Run customize.sh (for IP only)
+      run: |
+        if [ -f customize.sh ]; then
+          echo "✅ Running customize.sh to modify default IP"
+          chmod +x customize.sh
+          ./customize.sh
+        else
+          echo "⚠️ Warning: customize.sh not found in project root - skipping IP modification"
+        fi
 
     - name: Update feeds
-      run: cd openwrt && ./scripts/feeds update -a
-
-    - name: Debug - Check if naiveproxy is available
+      working-directory: ./openwrt
       run: |
-       cd openwrt
-       ./scripts/feeds list -s | grep naiveproxy || echo "naiveproxy NOT FOUND!"
-
-    - name: Install feeds
-      run: cd openwrt && ./scripts/feeds install -a
+        echo 'src-git helloworld https://github.com/fw876/helloworld' >> feeds.conf.default
+        ./scripts/feeds update -a
 
     - name: Load custom configuration
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e  $ CONFIG_FILE ] && mv  $ CONFIG_FILE openwrt/.config
-        chmod +x  $ DIY_P2_SH
+        if [ -e ./.config ]; then
+          echo "✅ Found .config in project root, copying to openwrt/.config"
+          cp -f ./.config ./openwrt/.config
+        else
+          echo "⚠️ Warning: .config not found in project root, using default config"
+        fi
+        
+        if [ -d ./files ]; then
+          echo "✅ Found files directory in project root, moving to openwrt/files"
+          mv -f ./files ./openwrt/files
+        fi
+        
         cd openwrt
-         $ GITHUB_WORKSPACE/ $ DIY_P2_SH
+        ./scripts/feeds install -a
+        make defconfig
 
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
@@ -107,69 +141,48 @@ jobs:
       env:
         TELEGRAM_CHAT_ID:  $ {{ secrets.TELEGRAM_CHAT_ID }}
         TELEGRAM_BOT_TOKEN:  $ {{ secrets.TELEGRAM_BOT_TOKEN }}
-
+        
     - name: Download package
-      id: package
+      working-directory: ./openwrt
       run: |
-        cd openwrt
-        make defconfig
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
+        make download -j $ (( $ (nproc)+1))
         find dl -size -1024c -exec rm -f {} \;
-
-    - name: Compile the firmware
-      id: compile
-      run: |
-        cd openwrt
-        echo -e " $ (nproc) thread compile"
-        make -j $ (nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >>  $ GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_ $ (cat DEVICE_NAME)" >>  $ GITHUB_ENV
-        echo "FILE_DATE=_ $ (date +"%Y%m%d%H%M")" >>  $ GITHUB_ENV
-
-    - name: Check space usage
-      if: (!cancelled())
-      run: df -hT
-
-    - name: Upload bin directory
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+        
+    - name: Cache
+      uses: stupidloud/cachewrtbuild@main
       with:
-        name: OpenWrt_bin $ {{ env.DEVICE_NAME }} $ {{ env.FILE_DATE }}
-        path: openwrt/bin
+        ccache: 'true'
+        mixkey: openwrt- $ {{ github.event.inputs.openwrt_version }}
+        clean:  $ {{ contains(github.event.action, 'nocache') }}
+        prefix:  $ {{ github.workspace }}/openwrt
+    
+    - name: Compile the firmware
+      working-directory: ./openwrt
+      run: |
+        echo -e " $ (( $ (nproc)+1)) thread compile"
+        make -j $ (( $ (nproc)+1)) || make -j1 V=s
 
     - name: Organize files
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
+        mkdir firmware
+        mv -f openwrt/bin/targets/*/*/{*combined*,*sysupgrade*} ./firmware/ 2>/dev/null || true
+        cd firmware
+        echo "v $ {{ env.date2 }}" > version.txt
+        md5= $ (md5sum *squashfs-sysupgrade* 2>/dev/null | awk '{print  $ 1}' || md5sum *squashfs-combined-efi* 2>/dev/null | awk '{print  $ 1}')
+        echo  $ md5 >> version.txt
+        rename -v "s/^openwrt/ $ {{ env.VERSION }}-openwrt/" * || true
+        echo  $ md5 >> version.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }}" >> version.txt
         echo "FIRMWARE= $ PWD" >>  $ GITHUB_ENV
-        echo "status=success" >>  $ GITHUB_OUTPUT
-
+        
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware $ {{ env.DEVICE_NAME }} $ {{ env.FILE_DATE }}
+        name: OpenWrt_firmware- $ {{ github.event.inputs.openwrt_version }}- $ {{ env.date }}
         path:  $ {{ env.FIRMWARE }}
-
-    - name: Upload firmware to cowtransfer
-      id: cowtransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_COWTRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer cow --block 2621440 -s -p 64 --no-progress  $ {FIRMWARE} 2>&1 | tee cowtransfer.log
-        echo "url= $ (cat cowtransfer.log | grep https | cut -f3 -d' ')" >>  $ GITHUB_OUTPUT
-
-    - name: Upload firmware to WeTransfer
-      id: wetransfer
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_WETRANSFER == 'true' && !cancelled()
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer wet -s -p 16 --no-progress  $ {FIRMWARE} 2>&1 | tee wetransfer.log
-        echo "url= $ (cat wetransfer.log | grep https | cut -f3 -d' ')" >>  $ GITHUB_OUTPUT
 
     - name: Generate release tag
       id: tag
@@ -177,8 +190,11 @@ jobs:
       run: |
         echo "release_tag= $ (date +"%Y.%m.%d-%H%M")" >>  $ GITHUB_OUTPUT
         touch release.txt
-        [ " $ UPLOAD_COWTRANSFER" = "true" ] && echo "🔗 [Cowtransfer]( $ {{ steps.cowtransfer.outputs.url }})" >> release.txt
-        [ " $ UPLOAD_WETRANSFER" = "true" ] && echo "🔗 [WeTransfer]( $ {{ steps.wetransfer.outputs.url }})" >> release.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }} Firmware" > release.txt
+        echo "Build date:  $ date" >> release.txt
+        echo "MD5:  $ md5" >> release.txt
+        echo "Firmware includes:" >> release.txt
+        echo "- helloworld plugin (if configured in .config)" >> release.txt
         echo "status=success" >>  $ GITHUB_OUTPUT
 
     - name: Upload firmware to release
