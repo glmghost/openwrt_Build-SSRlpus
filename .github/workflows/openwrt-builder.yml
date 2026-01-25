@@ -29,7 +29,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: github.event.repository.owner.id == github.event.sender.id
 
     name: Build OpenWrt ${{ github.event.inputs.openwrt_version }}
@@ -38,16 +38,38 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Free disk space
-      uses: easimon/maximize-build-space@v8
-      with:
-        tool-cache: false
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true       
+    - name: Free disk space (Phase 1)
+      run: |
+        # Remove unnecessary packages
+        sudo apt-get remove -y '^ghc-8.*' '^dotnet-.*' '^llvm-.*' || true
+        sudo apt-get remove -y 'php.*' 'mysql.*' 'azure.*' || true
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean -y
+        
+        # Clean up Docker
+        docker rmi $(docker image ls -aq) 2>/dev/null || true
+        sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /usr/local/lib/android 2>/dev/null || true
+        sudo rm -rf /opt/microsoft/powershell/7 2>/dev/null || true
+        
+        # Clean cache directories
+        df -h
+        sudo rm -rf /tmp/*
+        sudo rm -rf /var/tmp/*
+        sudo rm -rf /var/log/journal/*
+        
+        df -h
+
+    - name: Setup swap
+      run: |
+        # Create additional swap space
+        sudo swapoff /mnt/swapfile 2>/dev/null || true
+        sudo rm -f /mnt/swapfile
+        sudo fallocate -l 8G /mnt/swapfile
+        sudo chmod 600 /mnt/swapfile
+        sudo mkswap /mnt/swapfile
+        sudo swapon /mnt/swapfile
+        free -h
 
     - name: Initialization environment
       env:
@@ -58,7 +80,8 @@ jobs:
         gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
         python3-setuptools rsync swig unzip zlib1g-dev file wget scdoc \
         llvm python3-pyelftools libpython3-dev aria2 jq qemu-utils ccache rename \
-        libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev
+        libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev \
+        python3-distutils python3-venv python3-dev python3-pip python3-docutils
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "Asia/Shanghai"
@@ -85,14 +108,21 @@ jobs:
           git clone --depth 1 $REPO_URL -b "$REPO_BRANCH" openwrt
         fi
 
-    - name: Free up disk space
+    - name: Free up disk space (Phase 2)
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        # Use external storage for large directories
         sudo mkdir -p -m 777 /mnt/openwrt/dl /mnt/openwrt/bin /mnt/openwrt/staging_dir
         ln -sf /mnt/openwrt/dl openwrt/dl
         ln -sf /mnt/openwrt/bin openwrt/bin
         ln -sf /mnt/openwrt/staging_dir openwrt/staging_dir
+        
+        # Additional cleanup
+        df -h
+        sudo rm -rf ~/.cargo ~/.npm ~/.rbenv ~/.rvm
+        sudo rm -rf /opt/hostedtoolcache/node
+        df -h
 
     - name: Run customize.sh (for IP only)
       run: |
@@ -115,6 +145,11 @@ jobs:
         if [ -e ./.config ]; then
           echo "✅ Found .config in project root, copying to openwrt/.config"
           cp -f ./.config ./openwrt/.config
+          
+          # 禁用一些占用大量空间的组件
+          sed -i 's/CONFIG_GDB=y/# CONFIG_GDB is not set/' ./openwrt/.config
+          sed -i 's/CONFIG_DEBUG=y/# CONFIG_DEBUG is not set/' ./openwrt/.config
+          sed -i 's/CONFIG_DEVEL=y/# CONFIG_DEVEL is not set/' ./openwrt/.config
         else
           echo "⚠️ Warning: .config not found in project root, using default config"
         fi
@@ -140,8 +175,14 @@ jobs:
     - name: Download package
       working-directory: ./openwrt
       run: |
-        make download -j$(( $(nproc) + 1 ))
+        make download -j$(( $(nproc) / 2 ))
         find dl -size -1024c -exec rm -f {} \;
+        
+    - name: Check disk space before build
+      run: |
+        echo "Checking available disk space before build..."
+        df -h
+        du -sh openwrt/
         
     - name: Cache
       uses: stupidloud/cachewrtbuild@main
@@ -154,8 +195,9 @@ jobs:
     - name: Compile the firmware
       working-directory: ./openwrt
       run: |
-        echo -e "$(( $(nproc) + 1 )) thread compile"
-        make -j$(( $(nproc) + 1 )) || make -j1 V=s
+        echo -e "Using reduced thread count to conserve resources"
+        # 使用更少的线程来减少内存和磁盘I/O压力
+        make -j$(( $(nproc) / 4 + 1 )) V=s || make -j1 V=s
 
     - name: Organize files
       id: organize
@@ -205,6 +247,14 @@ jobs:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
+
+    - name: Cleanup
+      if: always()
+      run: |
+        # Disable and remove swap
+        sudo swapoff /mnt/swapfile 2>/dev/null || true
+        sudo rm -f /mnt/swapfile 2>/dev/null || true
+        free -h
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
