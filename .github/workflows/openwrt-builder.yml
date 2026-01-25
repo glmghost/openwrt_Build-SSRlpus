@@ -187,7 +187,11 @@ jobs:
         touch release.txt
         echo "OpenWrt ${{ github.event.inputs.openwrt_version }} Firmware" > release.txt
         echo "Build date: ${{ env.date2 }}" >> release.txt
-        echo "MD5: ${{ env.md5:-unknown }}" >> release.txt
+        if [ -n "$md5" ]; then
+          echo "MD5: $md5" >> release.txt
+        else
+          echo "MD5: unknown" >> release.txt
+        fi
         echo "Firmware includes:" >> release.txt
         echo "- helloworld plugin (if configured in .config)" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
