@@ -88,7 +88,7 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "Asia/Shanghai"
 
-    # ---【修复】: 获取当前日期 ---
+    # ---【修复】: 获取当前日期 (使用 | 保持多行) ---
     - name: Get current date
       id: date
       run: |
