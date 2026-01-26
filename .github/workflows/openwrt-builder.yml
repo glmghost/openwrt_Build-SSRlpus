@@ -1,3 +1,5 @@
+# 文件名: .github/workflows/build-openwrt-custom.yml
+
 name: OpenWrt Build with Custom Config
 
 on:
@@ -29,70 +31,100 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # 使用更稳定的 Ubuntu 版本
     if: github.event.repository.owner.id == github.event.sender.id
 
-    name: Build OpenWrt ${{ github.event.inputs.openwrt_version }}
+    name: Build OpenWrt  $ {{ github.event.inputs.openwrt_version }}
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Free disk space
-      uses: easimon/maximize-build-space@v8
-      with:
-        tool-cache: false
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true       
+    # ---【关键】: 更彻底地清理空间 ---
+    - name: Free disk space (Aggressive)
+      run: |
+        # 1. 清理 APT 包缓存
+        sudo apt-get clean
+        sudo apt-get autoremove -y
 
+        # 2. 删除不必要的软件包 (比 maxima-build-space 更彻底)
+        sudo apt-get remove -y '^ghc-.*' '^dotnet-.*' '^llvm-.*' '^nodejs.*' '^npm.*' '^python3.*' 'php.*' 'mysql.*' 'azure.*' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'libglu1' 'libglx-mesa0' 'libglx1' 'libgl1-mesa-glx' 'libgl1-mesa-dri' 'libglu1-mesa' 'libglu1-mesa-dev' 'libgl1' 'lib......' || true # 可以列出更多不必要软件包
+        # 如果上面命令报错太多，直接删除目录
+        sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /opt/microsoft/powershell /opt/hostedtoolcache/node
+        sudo rm -rf /usr/local/lib/android 2>/dev/null || true
+        sudo rm -rf ～/.cargo ～/.npm ～/.rbenv ～/.rvm ～/.cache/pip ～/.cache/Google 2>/dev/null || true # 清理用户缓存
+        # 3. 清理临时文件和日志
+        sudo rm -rf /tmp/*
+        sudo rm -rf /var/tmp/*
+        sudo rm -rf /var/log/journal/*
+        # 4. 检查空间
+        df -h
+
+    # ---【关键】: 创建并启用交换空间 ---
+    - name: Setup swap space
+      run: |
+        # 创建一个 8GB 的 swap 文件
+        sudo swapoff /mnt/swapfile 2>/dev/null || true
+        sudo rm -f /mnt/swapfile
+        sudo fallocate -l 8G /mnt/swapfile
+        sudo chmod 600 /mnt/swapfile
+        sudo mkswap /mnt/swapfile
+        sudo swapon /mnt/swapfile
+        free -h # 查看交换空间是否生效
+
+    # ---【关键】: 初始化环境 ---
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        # 更新并安装必要的构建依赖
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install build-essential clang flex bison g++ gawk \
         gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
         python3-setuptools rsync swig unzip zlib1g-dev file wget scdoc \
         llvm python3-pyelftools libpython3-dev aria2 jq qemu-utils ccache rename \
-        libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev
+        libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev \
+        python3-distutils python3-venv python3-dev python3-pip python3-docutils
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "Asia/Shanghai"
-        
+
     - name: Get current date
       id: date
       run: |
-        echo "date=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_ENV
-        echo "date2=$(date +'%m/%d %Y')" >> $GITHUB_ENV
-        echo "date3=$(date +'%m.%d')" >> $GITHUB_ENV
-        VERSION=$(date +'%m.%d')
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        
+        echo "date= $ (date +'%Y.%m.%d-%H%M')" >>  $ GITHUB_ENV
+        echo "date2= $ (date +'%m/%d %Y')" >>  $ GITHUB_ENV
+        echo "date3= $ (date +'%m.%d')" >>  $ GITHUB_ENV
+        VERSION= $ (date +'%m.%d')
+        echo "VERSION= $ VERSION" >>  $ GITHUB_ENV
+
+    # ---【关键】: 克隆源码 ---
     - name: Clone source code
       env: 
         REPO_URL: https://github.com/openwrt/openwrt
-        REPO_BRANCH: ${{ github.event.inputs.openwrt_version }}
+        REPO_BRANCH:  $ {{ github.event.inputs.openwrt_version }}
       run: |
-        if [ "$REPO_BRANCH" = "master" ]; then
-          git clone --depth 1 $REPO_URL -b master openwrt
-        elif [[ "$REPO_BRANCH" =~ ^[0-9]+\.[0-9]+$ ]]; then
-          git clone --depth 1 $REPO_URL -b "openwrt-$REPO_BRANCH" openwrt
+        if [ " $ REPO_BRANCH" = "master" ]; then
+          git clone --depth 1  $ REPO_URL -b master openwrt
+        elif [[ " $ REPO_BRANCH" =～ ^[0-9]+\.[0-9]+ $  ]]; then
+          git clone --depth 1  $ REPO_URL -b "openwrt- $ REPO_BRANCH" openwrt
         else
-          git clone --depth 1 $REPO_URL -b "$REPO_BRANCH" openwrt
+          git clone --depth 1  $ REPO_URL -b " $ REPO_BRANCH" openwrt
         fi
 
-    - name: Free up disk space
+    # ---【关键】: 使用外部存储挂载点 ---
+    - name: Setup external storage mount points
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        # 创建用于存放 dl, bin, staging_dir 的目录
         sudo mkdir -p -m 777 /mnt/openwrt/dl /mnt/openwrt/bin /mnt/openwrt/staging_dir
+        # 创建符号链接指向这些外部存储
         ln -sf /mnt/openwrt/dl openwrt/dl
         ln -sf /mnt/openwrt/bin openwrt/bin
         ln -sf /mnt/openwrt/staging_dir openwrt/staging_dir
+        # 再次检查空间
+        df -h
 
     - name: Run customize.sh (for IP only)
       run: |
@@ -132,30 +164,46 @@ jobs:
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        PASSWORD: ${{ secrets.PASSWORD }}
-        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-        REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+        SSH_PRIVATE_KEY:  $ {{ secrets.SSH_PRIVATE_KEY }}
+        PASSWORD:  $ {{ secrets.PASSWORD }}
+        REMOTE_HOST:  $ {{ secrets.REMOTE_HOST }}
+        REMOTE_PORT:  $ {{ secrets.REMOTE_PORT }}
         
-    - name: Download package
+    # ---【关键】: 强制单线程下载 ---
+    - name: Download package (Single Thread)
       working-directory: ./openwrt
       run: |
-        make download -j$(( $(nproc) + 1 ))
-        find dl -size -1024c -exec rm -f {} \;
-        
+        echo "Starting package download with single thread..."
+        make download -j1 # 改为单线程下载
+        echo "Package download completed."
+        # 清理下载缓存中的小文件
+        find dl -size -1024c -exec rm -f {} \; || true
+
+    # ---【关键】: 检查下载后空间 ---
+    - name: Check disk space after download
+      run: |
+        echo "Disk space after download:"
+        df -h
+        echo "Size of openwrt directory:"
+        du -sh openwrt/
+
+    # ---【关键】: 使用缓存 ---
     - name: Cache
       uses: stupidloud/cachewrtbuild@main
       with:
         ccache: 'true'
-        mixkey: openwrt-${{ github.event.inputs.openwrt_version }}
-        clean: ${{ contains(github.event.action, 'nocache') }}
-        prefix: ${{ github.workspace }}/openwrt
-    
-    - name: Compile the firmware
+        mixkey: openwrt- $ {{ github.event.inputs.openwrt_version }}
+        clean:  $ {{ contains(github.event.action, 'nocache') }}
+        prefix:  $ {{ github.workspace }}/openwrt
+
+    # ---【关键】: 强制单线程编译 ---
+    - name: Compile the firmware (Single Thread)
       working-directory: ./openwrt
       run: |
-        echo -e "$(( $(nproc) + 1 )) thread compile"
-        make -j$(( $(nproc) + 1 )) || make -j1 V=s
+        echo "Starting firmware compilation with single thread..."
+        # 优先使用单线程编译
+        make -j1 V=s || make -j1 V=sc # 如果第一种失败，尝试另一种
+        echo "Compilation completed."
 
     - name: Organize files
       id: organize
@@ -164,47 +212,55 @@ jobs:
         mkdir firmware
         mv -f openwrt/bin/targets/*/*/{*combined*,*sysupgrade*} ./firmware/ 2>/dev/null || true
         cd firmware
-        echo "v${{ env.date2 }}" > version.txt
-        md5=$(md5sum *squashfs-sysupgrade* 2>/dev/null | awk '{print $1}' || md5sum *squashfs-combined-efi* 2>/dev/null | awk '{print $1}')
-        echo $md5 >> version.txt
-        rename -v "s/^openwrt/${{ env.VERSION }}-openwrt/" * 2>/dev/null || true
-        echo $md5 >> version.txt
-        echo "OpenWrt ${{ github.event.inputs.openwrt_version }}" >> version.txt
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "v $ {{ env.date2 }}" > version.txt
+        md5= $ (md5sum *squashfs-sysupgrade* 2>/dev/null | awk '{print  $ 1}' || md5sum *squashfs-combined-efi* 2>/dev/null | awk '{print  $ 1}')
+        echo  $ md5 >> version.txt
+        rename -v "s/^openwrt/ $ {{ env.VERSION }}-openwrt/" * 2>/dev/null || true
+        echo  $ md5 >> version.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }}" >> version.txt
+        echo "FIRMWARE= $ PWD" >>  $ GITHUB_ENV
         
     - name: Upload firmware directory
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware-${{ github.event.inputs.openwrt_version }}-${{ env.date }}
-        path: ${{ env.FIRMWARE }}
+        name: OpenWrt_firmware- $ {{ github.event.inputs.openwrt_version }}- $ {{ env.date }}
+        path:  $ {{ env.FIRMWARE }}
 
     - name: Generate release tag
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "release_tag= $ (date +"%Y.%m.%d-%H%M")" >>  $ GITHUB_OUTPUT
         touch release.txt
-        echo "OpenWrt ${{ github.event.inputs.openwrt_version }} Firmware" > release.txt
-        echo "Build date: ${{ env.date2 }}" >> release.txt
-        if [ -n "$md5" ]; then
-          echo "MD5: $md5" >> release.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }} Firmware" > release.txt
+        echo "Build date:  $ {{ env.date2 }}" >> release.txt
+        if [ -n " $ md5" ]; then
+          echo "MD5:  $ md5" >> release.txt
         else
           echo "MD5: unknown" >> release.txt
         fi
         echo "Firmware includes:" >> release.txt
         echo "- helloworld plugin (if configured in .config)" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
+        echo "status=success" >>  $ GITHUB_OUTPUT
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN:  $ {{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
+        tag_name:  $ {{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        files:  $ {{ env.FIRMWARE }}/*
+
+    # ---【关键】: 清理交换空间 ---
+    - name: Cleanup swap
+      if: always()
+      run: |
+        sudo swapoff /mnt/swapfile 2>/dev/null || true
+        sudo rm -f /mnt/swapfile 2>/dev/null || true
+        free -h
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
@@ -219,4 +275,4 @@ jobs:
         keep_latest: 3
         delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN:  $ {{ secrets.GITHUB_TOKEN }}
