@@ -1,6 +1,6 @@
 # 文件名: .github/workflows/build-openwrt-custom.yml
 
-name: OpenWrt Build with Custom Config
+name: OpenWrt Build without helloworld
 
 on:
   repository_dispatch:
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-22.04 # 使用更稳定的 Ubuntu 版本
     if: github.event.repository.owner.id == github.event.sender.id
 
-    name: Build OpenWrt ${{ github.event.inputs.openwrt_version }}
+    name: Build OpenWrt  $ {{ github.event.inputs.openwrt_version }}
     
     steps:
     - name: Checkout
@@ -51,7 +51,7 @@ jobs:
         sudo apt-get remove -y '^ghc-.*' '^dotnet-.*' '^llvm-.*' '^nodejs.*' '^npm.*' 'php.*' 'mysql.*' 'azure.*' || true
         sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /opt/microsoft/powershell /opt/hostedtoolcache/node
         sudo rm -rf /usr/local/lib/android 2>/dev/null || true
-        sudo rm -rf ~/.cargo ~/.npm ~/.rbenv ~/.rvm ~/.cache/pip ~/.cache/Google 2>/dev/null || true # 清理用户缓存
+        sudo rm -rf ～/.cargo ～/.npm ～/.rbenv ～/.rvm ～/.cache/pip ～/.cache/Google 2>/dev/null || true # 清理用户缓存
         # 3. 清理临时文件和日志
         sudo rm -rf /tmp/*
         sudo rm -rf /var/tmp/*
@@ -92,27 +92,27 @@ jobs:
     - name: Get current date
       id: date
       run: |
-        DATE=$(date +'%Y.%m.%d-%H%M')
-        DATE2=$(date +'%m/%d %Y')
-        DATE3=$(date +'%m.%d')
-        VERSION=$(date +'%m.%d')
-        echo "date=$DATE" >> $GITHUB_ENV
-        echo "date2=$DATE2" >> $GITHUB_ENV
-        echo "date3=$DATE3" >> $GITHUB_ENV
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        DATE= $ (date +'%Y.%m.%d-%H%M')
+        DATE2= $ (date +'%m/%d %Y')
+        DATE3= $ (date +'%m.%d')
+        VERSION= $ (date +'%m.%d')
+        echo "date= $ DATE" >>  $ GITHUB_ENV
+        echo "date2= $ DATE2" >>  $ GITHUB_ENV
+        echo "date3= $ DATE3" >>  $ GITHUB_ENV
+        echo "VERSION= $ VERSION" >>  $ GITHUB_ENV
 
     # ---【关键】: 克隆源码 ---
     - name: Clone source code
       env: 
         REPO_URL: https://github.com/openwrt/openwrt
-        REPO_BRANCH: ${{ github.event.inputs.openwrt_version }}
+        REPO_BRANCH:  $ {{ github.event.inputs.openwrt_version }}
       run: |
-        if [ "$REPO_BRANCH" = "master" ]; then
-          git clone --depth 1 $REPO_URL -b master openwrt
-        elif [[ "$REPO_BRANCH" =~ ^[0-9]+\.[0-9]+$ ]]; then
-          git clone --depth 1 $REPO_URL -b "openwrt-$REPO_BRANCH" openwrt
+        if [ " $ REPO_BRANCH" = "master" ]; then
+          git clone --depth 1  $ REPO_URL -b master openwrt
+        elif [[ " $ REPO_BRANCH" =～ ^[0-9]+\.[0-9]+ $  ]]; then
+          git clone --depth 1  $ REPO_URL -b "openwrt- $ REPO_BRANCH" openwrt
         else
-          git clone --depth 1 $REPO_URL -b "$REPO_BRANCH" openwrt
+          git clone --depth 1  $ REPO_URL -b " $ REPO_BRANCH" openwrt
         fi
 
     # ---【关键】: 使用外部存储挂载点 ---
@@ -142,7 +142,8 @@ jobs:
     - name: Update feeds
       working-directory: ./openwrt
       run: |
-        echo 'src-git helloworld https://github.com/fw876/helloworld' >> feeds.conf.default
+        # 注意：这里移除了 helloworld feed
+        # echo 'src-git helloworld https://github.com/fw876/helloworld' >> feeds.conf.default
         ./scripts/feeds update -a
 
     - name: Load custom configuration
@@ -167,10 +168,10 @@ jobs:
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        PASSWORD: ${{ secrets.PASSWORD }}
-        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-        REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+        SSH_PRIVATE_KEY:  $ {{ secrets.SSH_PRIVATE_KEY }}
+        PASSWORD:  $ {{ secrets.PASSWORD }}
+        REMOTE_HOST:  $ {{ secrets.REMOTE_HOST }}
+        REMOTE_PORT:  $ {{ secrets.REMOTE_PORT }}
         
     # ---【关键】: 强制单线程下载 ---
     - name: Download package (Single Thread)
@@ -195,9 +196,9 @@ jobs:
       uses: stupidloud/cachewrtbuild@main
       with:
         ccache: 'true'
-        mixkey: openwrt-${{ github.event.inputs.openwrt_version }}
-        clean: ${{ contains(github.event.action, 'nocache') }}
-        prefix: ${{ github.workspace }}/openwrt
+        mixkey: openwrt- $ {{ github.event.inputs.openwrt_version }}
+        clean:  $ {{ contains(github.event.action, 'nocache') }}
+        prefix:  $ {{ github.workspace }}/openwrt
 
     # ---【关键】: 强制单线程编译 ---
     - name: Compile the firmware (Single Thread)
@@ -215,47 +216,46 @@ jobs:
         mkdir firmware
         mv -f openwrt/bin/targets/*/*/{*combined*,*sysupgrade*} ./firmware/ 2>/dev/null || true
         cd firmware
-        echo "v${{ env.date2 }}" > version.txt
-        md5=$(md5sum *squashfs-sysupgrade* 2>/dev/null | awk '{print $1}' || md5sum *squashfs-combined-efi* 2>/dev/null | awk '{print $1}')
-        echo $md5 >> version.txt
-        rename -v "s/^openwrt/${{ env.VERSION }}-openwrt/" * 2>/dev/null || true
-        echo $md5 >> version.txt
-        echo "OpenWrt ${{ github.event.inputs.openwrt_version }}" >> version.txt
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "v $ {{ env.date2 }}" > version.txt
+        md5= $ (md5sum *squashfs-sysupgrade* 2>/dev/null | awk '{print  $ 1}' || md5sum *squashfs-combined-efi* 2>/dev/null | awk '{print  $ 1}')
+        echo  $ md5 >> version.txt
+        rename -v "s/^openwrt/ $ {{ env.VERSION }}-openwrt/" * 2>/dev/null || true
+        echo  $ md5 >> version.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }}" >> version.txt
+        echo "FIRMWARE= $ PWD" >>  $ GITHUB_ENV
         
     - name: Upload firmware directory
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware-${{ github.event.inputs.openwrt_version }}-${{ env.date }}
-        path: ${{ env.FIRMWARE }}
+        name: OpenWrt_firmware- $ {{ github.event.inputs.openwrt_version }}- $ {{ env.date }}
+        path:  $ {{ env.FIRMWARE }}
 
     - name: Generate release tag
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "release_tag= $ (date +"%Y.%m.%d-%H%M")" >>  $ GITHUB_OUTPUT
         touch release.txt
-        echo "OpenWrt ${{ github.event.inputs.openwrt_version }} Firmware" > release.txt
-        echo "Build date: ${{ env.date2 }}" >> release.txt
-        if [ -n "$md5" ]; then
-          echo "MD5: $md5" >> release.txt
+        echo "OpenWrt  $ {{ github.event.inputs.openwrt_version }} Firmware" > release.txt
+        echo "Build date:  $ {{ env.date2 }}" >> release.txt
+        if [ -n " $ md5" ]; then
+          echo "MD5:  $ md5" >> release.txt
         else
           echo "MD5: unknown" >> release.txt
         fi
-        echo "Firmware includes:" >> release.txt
-        echo "- helloworld plugin (if configured in .config)" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
+        echo "Built without helloworld plugin." >> release.txt
+        echo "status=success" >>  $ GITHUB_OUTPUT
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN:  $ {{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
+        tag_name:  $ {{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        files:  $ {{ env.FIRMWARE }}/*
 
     # ---【关键】: 清理交换空间 ---
     - name: Cleanup swap
@@ -278,4 +278,4 @@ jobs:
         keep_latest: 3
         delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN:  $ {{ secrets.GITHUB_TOKEN }}
