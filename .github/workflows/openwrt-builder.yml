@@ -166,12 +166,12 @@ jobs:
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
         
-    # ---【关键】: 强制单线程下载 ---
-    - name: Download package (Single Thread)
+    # ---【移除】: 不再强制单线程下载 ---
+    - name: Download package
       working-directory: ./openwrt
       run: |
-        echo "Starting package download with single thread..."
-        make download -j1 # 改为单线程下载
+        echo "Starting package download..."
+        make download -j$(nproc) # 使用 nproc 获取 CPU 核心数进行多线程下载
         echo "Package download completed."
         # 清理下载缓存中的小文件
         find dl -size -1024c -exec rm -f {} \; || true
@@ -193,13 +193,12 @@ jobs:
         clean: ${{ contains(github.event.action, 'nocache') }}
         prefix: ${{ github.workspace }}/openwrt
 
-    # ---【关键】: 强制单线程编译 ---
-    - name: Compile the firmware (Single Thread)
+    # ---【移除】: 不再强制单线程编译 ---
+    - name: Compile the firmware
       working-directory: ./openwrt
       run: |
-        echo "Starting firmware compilation with single thread..."
-        # 优先使用单线程编译
-        make -j1 V=s || make -j1 V=sc # 如果第一种失败，尝试另一种
+        echo "Starting firmware compilation..."
+        make -j$(nproc) V=s # 使用 nproc 获取 CPU 核心数进行多线程编译
         echo "Compilation completed."
 
     - name: Organize files
@@ -240,17 +239,25 @@ jobs:
         echo "Built without helloworld plugin." >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
+    # ---【修复】: 修复上传 Release 和删除旧版本的权限问题 ---
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
-      # ---【修复】: 明确使用 Personal Access Token (PAT) ---
-      # 请在仓库的 Secrets 中设置 PERSONAL_ACCESS_TOKEN
       env:
         GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@v0.2.1
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # 确保提供 GITHUB_TOKEN
 
     # ---【关键】: 清理交换空间 ---
     - name: Cleanup swap
@@ -266,12 +273,3 @@ jobs:
         retain_days: 1
         keep_minimum_runs: 3
 
-    - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v0.2.1
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      # ---【修复】: 为删除旧版本也使用 PAT ---
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # 使用 PAT
