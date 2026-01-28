@@ -88,11 +88,11 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "Asia/Shanghai"
 
-    # ---【修复】: 获取当前日期 (单行紧凑命令) ---
+    # ---【修复】: 获取当前日期 (使用 bash -c 绕过解析) ---
     - name: Get current date
       id: date
       run: |
-        DATE=$(date +'%Y.%m.%d-%H%M'); DATE2=$(date +'%m/%d %Y'); DATE3=$(date +'%m.%d'); VERSION=$(date +'%m.%d'); echo "date=$DATE" >> $GITHUB_ENV; echo "date2=$DATE2" >> $GITHUB_ENV; echo "date3=$DATE3" >> $GITHUB_ENV; echo "VERSION=$VERSION" >> $GITHUB_ENV
+        bash -c 'DATE=$(date +'"'"'%Y.%m.%d-%H%M'"'"'); DATE2=$(date +'"'"'%m/%d %Y'"'"'); DATE3=$(date +'"'"'%m.%d'"'"'); VERSION=$(date +'"'"'%m.%d'"'"'); echo "date=$DATE" >> $GITHUB_ENV; echo "date2=$DATE2" >> $GITHUB_ENV; echo "date3=$DATE3" >> $GITHUB_ENV; echo "VERSION=$VERSION" >> $GITHUB_ENV'
 
     # ---【关键】: 克隆源码 ---
     - name: Clone source code
@@ -243,8 +243,10 @@ jobs:
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
+      # ---【修复】: 明确使用 Personal Access Token (PAT) ---
+      # 请在仓库的 Secrets 中设置 PERSONAL_ACCESS_TOKEN
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
@@ -267,8 +269,9 @@ jobs:
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@v0.2.1
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      # ---【修复】: 为删除旧版本也使用 PAT ---
       with:
         keep_latest: 3
         delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # 使用 PAT
