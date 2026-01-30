@@ -244,7 +244,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }} # 现在引用 REPO_TOKEN
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
@@ -257,7 +257,7 @@ jobs:
         keep_latest: 3
         delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # 确保提供 GITHUB_TOKEN
+        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }} # 现在引用 REPO_TOKEN
 
     # ---【关键】: 清理交换空间 ---
     - name: Cleanup swap
