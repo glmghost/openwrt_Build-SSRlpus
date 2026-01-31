@@ -239,16 +239,21 @@ jobs:
         echo "Built without helloworld plugin." >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # ---【修复】: 修复上传 Release 和删除旧版本的权限问题 ---
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }} # 现在引用 REPO_TOKEN
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
+
+    - name: Delete workflow runs
+      uses: glmghost/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
 
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@v0.2.1
@@ -257,19 +262,4 @@ jobs:
         keep_latest: 3
         delete_tags: true
       env:
-        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }} # 现在引用 REPO_TOKEN
-
-    # ---【关键】: 清理交换空间 ---
-    - name: Cleanup swap
-      if: always()
-      run: |
-        sudo swapoff /mnt/swapfile 2>/dev/null || true
-        sudo rm -f /mnt/swapfile 2>/dev/null || true
-        free -h
-
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        retain_days: 1
-        keep_minimum_runs: 3
-
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
