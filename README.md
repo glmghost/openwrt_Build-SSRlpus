@@ -1,39 +1,90 @@
-**English** | [中文](https://p3terx.com/archives/build-openwrt-with-github-actions.html)
+#### AutoBuild-OpenWrt
+[1]: https://img.shields.io/badge/license-GPLV2-brightgreen.svg
+[2]: /LICENSE
+[3]: https://img.shields.io/badge/PRs-welcome-brightgreen.svg
+[4]: https://github.com/kenzok8/openwrt_Build/pulls
+[5]: https://img.shields.io/badge/Issues-welcome-brightgreen.svg
+[6]: https://github.com/kenzok8/openwrt_Build/issues/new
+[7]: https://img.shields.io/github/v/release/hyird/Action-Openwrt
+[8]: https://github.com/kenzok8/openwrt_Build/releases
+[10]: https://img.shields.io/badge/Contact-telegram-blue
+[11]: https://t.me/joinchat/JjxmyRZZXJWb74I-sCrryA
+[12]: https://github.com/kenzok8/openwrt_Build/actions/workflows/Lean.yml/badge.svg
+[13]: https://github.com/kenzok8/openwrt_Build/actions
 
-# Actions-OpenWrt
+[![license][1]][2]
+[![GitHub Stars](https://img.shields.io/github/stars/kenzok8/openwrt_Build.svg?style=flat-square&label=Stars)](https://github.com/kenzok8/openwrt_Build/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/kenzok8/openwrt_Build.svg?style=flat-square&label=Forks)](https://github.com/kenzok8/openwrt_Build)
+[![PRs Welcome][3]][4]
+[![Issue Welcome][5]][6]
+[![AutoBuild][12]][13]
 
-[![LICENSE](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square&label=LICENSE)](https://github.com/P3TERX/Actions-OpenWrt/blob/master/LICENSE)
-![GitHub Stars](https://img.shields.io/github/stars/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Stars&logo=github)
-![GitHub Forks](https://img.shields.io/github/forks/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Forks&logo=github)
+<a href="https://t.me/joinchat/JjxmyRZZXJWb74I-sCrryA" target="_blank">Telegram</a>
 
-A template for building OpenWrt with GitHub Actions
+<img src="https://v1.jinrishici.com/all.svg?font-size=24&spacing=3">
 
-## Usage
 
-- Click the [Use this template](https://github.com/P3TERX/Actions-OpenWrt/generate) button to create a new repository.
-- Generate `.config` files using [Lean's OpenWrt](https://github.com/coolsnowwolf/lede) source code. ( You can change it through environment variables in the workflow file. )
-- Push `.config` file to the GitHub repository.
-- Select `Build OpenWrt` on the Actions page.
-- Click the `Run workflow` button.
-- When the build is complete, click the `Artifacts` button in the upper right corner of the Actions page to download the binaries.
+##### [openwrt固件与插件下载](https://op.dllkids.xyz/op/firmware/)
 
-## Tips
+##### [docker镜像下载](https://hub.docker.com/r/kenzok8/openwrt-6p/tags)
 
-- It may take a long time to create a `.config` file and build the OpenWrt firmware. Thus, before create repository to build your own firmware, you may check out if others have already built it which meet your needs by simply [search `Actions-Openwrt` in GitHub](https://github.com/search?q=Actions-openwrt).
-- Add some meta info of your built firmware (such as firmware architecture and installed packages) to your repository introduction, this will save others' time.
+#### 源码来源：
+[![esir](https://img.shields.io/badge/AutoBuild-esir-red.svg?style=flat&logo=appveyor)](https://github.com/esirplayground/AutoBuild-OpenWrt)
+ [![Lienol](https://img.shields.io/badge/passwall-openwrt-blueviolet.svg?style=flat&logo=appveyor)](https://github.com/xiaorouji/openwrt-passwall) 
+[![immortalwrt](https://img.shields.io/badge/immortalwrt-openwrt-orange.svg?style=flat&logo=appveyor)](https://github.com/immortalwrt/immortalwrt) 
+[![Lean](https://img.shields.io/badge/package-Lean-blueviolet.svg?style=flat&logo=appveyor)](https://github.com/coolsnowwolf/lede) 
+[![P3TERX](https://img.shields.io/badge/Actions-P3TERX-success.svg?style=flat&logo=appveyor)](https://github.com/P3TERX/Actions-OpenWrt)
 
-## Credits
+##### 固件发布:
 
-- [Microsoft Azure](https://azure.microsoft.com)
-- [GitHub Actions](https://github.com/features/actions)
-- [OpenWrt](https://github.com/openwrt/openwrt)
-- [coolsnowwolf/lede](https://github.com/coolsnowwolf/lede)
-- [Mikubill/transfer](https://github.com/Mikubill/transfer)
-- [softprops/action-gh-release](https://github.com/softprops/action-gh-release)
-- [Mattraks/delete-workflow-runs](https://github.com/Mattraks/delete-workflow-runs)
-- [dev-drprasad/delete-older-releases](https://github.com/dev-drprasad/delete-older-releases)
-- [peter-evans/repository-dispatch](https://github.com/peter-evans/repository-dispatch)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/kenzok8/openwrt_Build?style=for-the-badge&label=固件下载)](https://github.com/kenzok8/openwrt_Build/releases/latest)
 
-## License
 
-[MIT](https://github.com/P3TERX/Actions-OpenWrt/blob/main/LICENSE) © [**P3TERX**](https://p3terx.com)
+##### 固件下载链接
+
+- [Lienol_24.10固件地址](https://op.dllkids.xyz/op/firmware/Lienol/)
+- [Lean固件地址](https://op.dllkids.xyz/op/firmware/Lean/)
+- [immortalwrt-24.10固件](https://op.dllkids.xyz/op/firmware/ctc_24.10/)
+- [immortalwrt-18.06固件](https://op.dllkids.xyz/op/firmware/ctc_18.06/)
+- [nanopi-r5s固件下载](https://op.dllkids.xyz/op/firmware/nanopi-r5s/)
+- [nanopi-r6s固件下载](https://op.dllkids.xyz/op/firmware/nanopi-r6s/)
+
+### 默认插件包含:
+
++ Mosdns
++ openclash
++ SSR Plus
++ homeproxy
++ mihomo
++ 动态DDNS
++ UPNP 自动端口转发
++ 默认多个主题
++ 默认管理 IP: 192.168.1.251, 用户名 root，密码 password
+
+* 修改默认ip
+
+```bash
+sed -i 's/192.168.1.1/192.168.3.1/g' package/base-files/files/bin/config_generate
+```
+* 替换终端为bash	
+```bash
+sed -i 's/\/bin\/ash/\/bin\/bash/' package/base-files/files/etc/passwd
+```
+
+* 添加新的主题
+```bash
+git clone https://github.com/kenzok8/luci-theme-ifit.git package/lean/luci-theme-ifit
+```
+* 添加常用软件包
+```bash
+git clone https://github.com/kenzok8/openwrt-packages.git package/openwrt-packages
+```
+* 删除默认密码
+```bash
+sed -i "/CYXluq4wUazHjmCDBCqXF/d" package/lean/default-settings/files/zzz-default-settings
+```
+
+* 取消bootstrap为默认主题	
+```bash
+sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
+```
